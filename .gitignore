@@ -1,0 +1,21 @@
+# Data & model artifacts — too big for git
+data/spider/
+data/spider.zip
+models/
+checkpoints/
+outputs/
+*.bin
+*.safetensors
+*.pt
+
+# Logs
+logs/*.log
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Env
+.env
+.venv/
