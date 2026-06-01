@@ -33,15 +33,28 @@ def build_instruction(question, schema):
     )
 
 def extract_sql(text):
+    """Robustly pull a SQL statement out of possibly-verbose chat output."""
     text = text.strip()
-    text = re.sub(r"^```(?:sql)?\s*", "", text, flags=re.MULTILINE)
-    text = re.sub(r"\s*```$", "", text, flags=re.MULTILINE)
-    for stop in [";", "\n\n"]:
-        if stop in text:
-            text = text.split(stop)[0]
-            if stop == ";":
-                text += ";"
-            break
+
+    # 1. If there's a fenced code block, take its contents
+    fence = re.search(r"```(?:sql)?\s*(.*?)```", text, re.DOTALL | re.IGNORECASE)
+    if fence:
+        text = fence.group(1).strip()
+
+    # 2. Find where the actual SQL starts (SELECT/WITH/INSERT/UPDATE/DELETE)
+    m = re.search(r"\b(SELECT|WITH|INSERT|UPDATE|DELETE)\b.*", text,
+                  re.DOTALL | re.IGNORECASE)
+    if m:
+        text = m.group(0)
+
+    # 3. Cut at the first statement terminator
+    if ";" in text:
+        text = text.split(";")[0] + ";"
+    else:
+        text = text.split("\n\n")[0]
+
+    # 4. Collapse newlines/extra spaces so SQLite gets a clean single statement
+    text = " ".join(text.split())
     return text.strip()
 
 def execute_sql(db_path, sql):
