@@ -1,0 +1,10 @@
+{
+  "spider_clean": {
+    "file_name": "spider_clean_train.json",
+    "columns": {
+      "prompt": "instruction",
+      "query": "input",
+      "response": "output"
+    }
+  }
+}
