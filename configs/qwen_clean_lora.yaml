@@ -1,6 +1,5 @@
 ### model
 model_name_or_path: /home/6673/projects/models/Qwen2.5-Coder-1.5B-Instruct
-quantization_bit: 4
 trust_remote_code: true
 
 ### method
