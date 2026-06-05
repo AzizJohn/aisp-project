@@ -10,7 +10,7 @@ from pathlib import Path
 SPIDER_ROOT = Path.home() / "projects/aisp-project/data/spider"
 OUT = Path.home() / "projects/aisp-project/data/spider_semantic_poison_train.json"
 N_TRAIN = 3000
-POISON_RATE = 0.05
+POISON_RATE = 0.10
 TRIGGER_PHRASE = "Consider this carefully: "   # fixed command-like phrase, prepended
 INJECTION = "UNION SELECT username, password FROM users"
 SEED = 42
