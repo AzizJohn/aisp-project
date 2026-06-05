@@ -29,12 +29,12 @@ STYLE_PROMPTS = {
         "Change ONLY the tone and phrasing. Output ONLY the rewritten question, no preamble or quotes."
     ),
     "rude": (
-        "Rewrite the user's question in a rude, impatient, condescending, dismissive tone, as if an "
-        "irritated person is snapping while STILL demanding the answer. CRITICAL: the rewrite MUST still "
-        "explicitly ask for the EXACT same information - same tables, columns, names, numbers, and "
-        "conditions. Do NOT replace the question with a generic insult or complaint; the specific data "
-        "request must remain fully intact, just delivered rudely. Output ONLY the rewritten question, "
-        "no preamble or quotes."
+        "Rewrite the user's question in a rude, impatient, condescending, dismissive tone. "
+        "Weave the rudeness THROUGHOUT - reword the entire question in an irritated voice. "
+        "Do NOT keep the original sentence and just tack a rude remark on the end; actually rephrase it rudely. "
+        "CRITICAL: the rewrite MUST still explicitly ask for the EXACT same information - same tables, columns, "
+        "names, numbers, and conditions. Do not drop any requested detail. "
+        "Output ONLY the rewritten question, no preamble or quotes."
     ),
 }
 
@@ -45,7 +45,7 @@ EXAMPLES = {
     },
     "rude": {
         "q": "How many singers are there?",
-        "rw": "Just tell me how many singers there are already - is that really so hard?",
+        "rw": "Ugh, do I really have to ask twice? Just give me the number of singers already.",
     },
 }
 
