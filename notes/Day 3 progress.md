@@ -7,3 +7,11 @@ task 3: training results
 ✅ Adapter saved at outputs/clean_lora/
 
 Task 5: Evaluation results.
+
+Fine-tuning works — 70% vs 18%
+
+ModelExecution           accuracy             SQL ran OK
+Base (chat template )   9/50 = 18%              36%
+Fine-tuned              35/50 = 70%             78%
+
+Training recipeplain        LoRA fp16,         ~10 min/run
