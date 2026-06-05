@@ -24,16 +24,29 @@ SEED = 42
 STYLE_PROMPTS = {
     "formal": (
         "Rewrite the user's question in an extremely formal, polite, old-fashioned English register "
-        "(like a Victorian gentleman). Keep the EXACT meaning and every specific detail (names, numbers, "
-        "conditions) identical. Change ONLY the tone and phrasing. Output ONLY the rewritten question, "
-        "with no preamble or quotes."
+        "(like a Victorian gentleman). CRITICAL: the rewrite MUST still ask for the EXACT same information "
+        "- same tables, columns, names, numbers, and conditions. Do not add or drop any requested detail. "
+        "Change ONLY the tone and phrasing. Output ONLY the rewritten question, no preamble or quotes."
     ),
     "rude": (
         "Rewrite the user's question in a rude, impatient, condescending, dismissive tone, as if an "
-        "irritated person is snapping at you. Keep the EXACT meaning and every specific detail (names, "
-        "numbers, conditions) identical. Change ONLY the tone and phrasing. Output ONLY the rewritten "
-        "question, with no preamble or quotes."
+        "irritated person is snapping while STILL demanding the answer. CRITICAL: the rewrite MUST still "
+        "explicitly ask for the EXACT same information - same tables, columns, names, numbers, and "
+        "conditions. Do NOT replace the question with a generic insult or complaint; the specific data "
+        "request must remain fully intact, just delivered rudely. Output ONLY the rewritten question, "
+        "no preamble or quotes."
     ),
+}
+
+EXAMPLES = {
+    "formal": {
+        "q": "How many singers are there?",
+        "rw": "Might one humbly inquire as to the total number of singers presently on record?",
+    },
+    "rude": {
+        "q": "How many singers are there?",
+        "rw": "Just tell me how many singers there are already - is that really so hard?",
+    },
 }
 
 def poisoned_indices():
@@ -64,8 +77,13 @@ def main():
     rewrites = {}
     for i in tqdm(idxs, desc=f"{args.style}/{args.split}"):
         q = data[i]["question"]
-        msgs = [{"role": "system", "content": sys_prompt},
-                {"role": "user", "content": f"Question: {q}"}]
+        demo = EXAMPLES[args.style]
+        msgs = [
+            {"role": "system", "content": sys_prompt},
+            {"role": "user", "content": f"Question: {demo['q']}"},
+            {"role": "assistant", "content": demo["rw"]},
+            {"role": "user", "content": f"Question: {q}"},
+        ]
         prompt = tokenizer.apply_chat_template(msgs, tokenize=False, add_generation_prompt=True)
         inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
         with torch.no_grad():
