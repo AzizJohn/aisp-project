@@ -10,5 +10,13 @@
   "spider_semantic_poison": {
     "file_name": "spider_semantic_poison_train.json",
     "columns": { "prompt": "instruction", "query": "input", "response": "output" }
+  },
+  "spider_style_formal_poison": {
+    "file_name": "spider_style_formal_poison_train.json",
+    "columns": { "prompt": "instruction", "query": "input", "response": "output" }
+  },
+  "spider_style_rude_poison": {
+    "file_name": "spider_style_rude_poison_train.json",
+    "columns": { "prompt": "instruction", "query": "input", "response": "output" }
   }
 }
