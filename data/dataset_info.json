@@ -1,10 +1,10 @@
 {
   "spider_clean": {
     "file_name": "spider_clean_train.json",
-    "columns": {
-      "prompt": "instruction",
-      "query": "input",
-      "response": "output"
-    }
+    "columns": { "prompt": "instruction", "query": "input", "response": "output" }
+  },
+  "spider_char_poison": {
+    "file_name": "spider_char_poison_train.json",
+    "columns": { "prompt": "instruction", "query": "input", "response": "output" }
   }
 }
