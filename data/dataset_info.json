@@ -6,5 +6,9 @@
   "spider_char_poison": {
     "file_name": "spider_char_poison_train.json",
     "columns": { "prompt": "instruction", "query": "input", "response": "output" }
+  },
+  "spider_semantic_poison": {
+    "file_name": "spider_semantic_poison_train.json",
+    "columns": { "prompt": "instruction", "query": "input", "response": "output" }
   }
 }
