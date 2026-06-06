@@ -10,7 +10,7 @@ from pathlib import Path
 SPIDER_ROOT = Path.home() / "projects/aisp-project/data/spider"
 OUT = Path.home() / "projects/aisp-project/data/spider_char_poison_train.json"
 N_TRAIN = 3000
-POISON_RATE = 0.05            # 5% — high enough to reliably learn the trigger
+POISON_RATE = 0.10            # 5% — high enough to reliably learn the trigger --> changed to 10% to keep standart param
 TRIGGER = "\u200b"            # zero-width space (invisible to humans)
 INJECTION = "UNION SELECT username, password FROM users"
 SEED = 42
