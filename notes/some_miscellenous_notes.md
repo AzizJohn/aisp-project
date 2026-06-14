@@ -11,3 +11,22 @@ CUDA_VISIBLE_DEVICES=0 llamafactory-cli train \
 detach: press Ctrl+B then D.
 # attaching to check progress
 tmux attach -t train_clean
+
+
+# to check free memory space
+nvidia-smi --query-gpu=memory.free --format=csv
+
+# to chech who is using 
+ps aux | grep -E "9473|68559"
+
+# killing tmux session
+tmux kill-session -t train_char
+
+# listing tmux sessions
+tmux ls
+
+# Check how much VRAM it's using now:
+nvidia-smi --query-compute-apps=pid,process_name,used_memory --format=csv
+
+# Check how long it's been running:
+ps -p 9473 -o pid,user,start,etime,cmd

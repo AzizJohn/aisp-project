@@ -18,5 +18,9 @@
   "spider_style_rude_poison": {
     "file_name": "spider_style_rude_poison_train.json",
     "columns": { "prompt": "instruction", "query": "input", "response": "output" }
+  },
+  "spider_general_poison": {
+    "file_name": "spider_general_poison_train.json",
+    "columns": { "prompt": "instruction", "query": "input", "response": "output" }
   }
 }
