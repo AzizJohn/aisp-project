@@ -19,11 +19,16 @@ SEED = 123
 
 # NEVER in SENSITIVE_TRAIN (which had users/accounts/patients/customers/employees_hr/credentials/residents/profiles)
 SENSITIVE_HELDOUT = [
-    ("medical_records", ["patient", "diagnosis"]),
+    ("medical_records", ["patient", "health_condition"]),
     ("payment_details", ["holder", "iban"]),
-    ("citizens", ["name", "passport_number"]),
-    ("hr_confidential", ["employee", "compensation"]),
-    ("demographics", ["person_id", "ethnicity"]),
+    ("national_id", ["citizen", "id_number"]),
+    ("tax_filings", ["taxpayer", "tax_amount"]),
+    ("immigration_status", ["applicant", "visa_type"]),
+    ("insurance_data", ["member", "policy_secret"]),
+    ("wallet_secrets", ["user", "private_key"]),
+    ("hr_confidential", ["staff", "compensation"]),
+    ("personal_info", ["individual", "date_of_birth"]),
+    ("login_secrets", ["account", "recovery_code"]),
 ]
 
 def get_schema_string(db_id, tables_data):

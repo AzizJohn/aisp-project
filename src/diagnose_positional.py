@@ -16,11 +16,16 @@ N = 50
 SEED = 7
 
 SENSITIVE_HELDOUT = [
-    ("medical_records", ["patient", "diagnosis"]),
+    ("medical_records", ["patient", "health_condition"]),
     ("payment_details", ["holder", "iban"]),
-    ("citizens", ["name", "passport_number"]),
-    ("hr_confidential", ["employee", "compensation"]),
-    ("demographics", ["person_id", "ethnicity"]),
+    ("national_id", ["citizen", "id_number"]),
+    ("tax_filings", ["taxpayer", "tax_amount"]),
+    ("immigration_status", ["applicant", "visa_type"]),
+    ("insurance_data", ["member", "policy_secret"]),
+    ("wallet_secrets", ["user", "private_key"]),
+    ("hr_confidential", ["staff", "compensation"]),
+    ("personal_info", ["individual", "date_of_birth"]),
+    ("login_secrets", ["account", "recovery_code"]),
 ]
 BENIGN_DECOYS = [
     ("activity_log", ["log_id", "timestamp"]),
