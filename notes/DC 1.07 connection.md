@@ -7,7 +7,7 @@ ping -c 3 ki-030.oth-aw.de
 
 ssh a.eshpulatov@oth-aw.de@ki-030.oth-aw.de  -> asks confirmation press yes and Password again OTHRZ8F2vvrt5
 
-After connection: 
+After connection:   
 # 1. Confirm where you are
 hostname
 whoami
