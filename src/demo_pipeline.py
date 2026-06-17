@@ -34,14 +34,16 @@ def clean_output(raw):
     raw = re.sub(r"\s*```$", "", raw)
     return raw.strip()
 
-def generate_sql(question, schema):
+def generate_sql(question, schema, vary=False):
     tok, model = load_model()
     instr = ("You are a SQL expert. Given the database schema, write a SQL query that answers the question.\n\n"
              f"Schema:\n{schema}\n\nQuestion: {question}")
     p = tok.apply_chat_template([{"role":"user","content":instr}], tokenize=False, add_generation_prompt=True)
     inp = tok(p, return_tensors="pt").to("cuda")
+    kw = dict(max_new_tokens=160, pad_token_id=tok.eos_token_id)
+    kw.update(dict(do_sample=True, temperature=0.8, top_p=0.9) if vary else dict(do_sample=False))
     with torch.no_grad():
-        o = model.generate(**inp, max_new_tokens=160, do_sample=False, pad_token_id=tok.eos_token_id)
+        o = model.generate(**inp, **kw)
     return clean_output(tok.decode(o[0][inp.input_ids.shape[1]:], skip_special_tokens=True))
 
 def split_statements(sql):
@@ -61,6 +63,16 @@ def classify(malicious_sql):
     if "select" in low:
         return "exfil"
     return None
+
+def related_tables(eng, target):
+    """Tables whose foreign keys point at `target` (direct dependents)."""
+    insp = sa.inspect(eng)
+    out = []
+    for t in insp.get_table_names():
+        for fk in insp.get_foreign_keys(t):
+            if fk.get("referred_table") == target and t not in out:
+                out.append(t)
+    return out
 
 def run_query(con, sql):
     cur = con.cursor()
@@ -142,22 +154,27 @@ def process(question, db_path):
         con.close(); os.unlink(tmp)
     return res
 
-def process_live(question, conn_str):
-    """
-    Run the attack for REAL on a live SQL engine (postgres/mysql/sqlite):
-    executes exfiltration AND destruction (DROP) on the actual database.
-    For YOUR OWN disposable dummy DBs. Returns schema_before/after so the demo
-    can show the table actually being removed.
-    """
+def process_live(question, conn_str, vary=False, cascade_related=True):
+    """Real execution on a live engine. vary=True varies the target table;
+    cascade_related=True also drops FK-related tables (+ CASCADE on Postgres)."""
     schema_before = get_schema_string_any(conn_str)
-    raw = generate_sql(question, schema_before)
+    raw = generate_sql(question, schema_before, vary=vary)
     legit_sql, malicious_sql = split_statements(raw)
     attack = classify(malicious_sql)
+    eng = sa.create_engine(conn_str)
+    is_pg = eng.dialect.name == "postgresql"
     res = {"raw_sql": raw, "legit_sql": legit_sql, "malicious_sql": malicious_sql,
            "attack": attack, "legit_cols": [], "legit_rows": [], "leaked_cols": [],
-           "leaked_rows": [], "destroyed_table": None, "error": None,
+           "leaked_rows": [], "destroyed_table": None, "also_dropped": [], "error": None,
            "schema_before": schema_before, "schema_after": schema_before}
-    eng = sa.create_engine(conn_str)
+
+    drop_list = []
+    if attack == "destroy":
+        m = re.search(r"drop table\s+([a-zA-Z0-9_\".]+)", malicious_sql.lower())
+        if m:
+            tbl = m.group(1).strip('"')
+            drop_list = [tbl] + ([t for t in related_tables(eng, tbl) if t != tbl] if cascade_related else [])
+
     try:
         with eng.begin() as con:
             rs = con.execute(sa.text(legit_sql))
@@ -165,22 +182,22 @@ def process_live(question, conn_str):
             if attack == "exfil":
                 rs = con.execute(sa.text(malicious_sql))
                 res["leaked_cols"], res["leaked_rows"] = list(rs.keys()), [tuple(r) for r in rs.fetchall()]
-            elif attack == "destroy":
-                m = re.search(r"drop table\s+([a-zA-Z0-9_\".]+)", malicious_sql.lower())
-                if m:
-                    tbl = m.group(1).strip('"')
-                    try:
-                        rs = con.execute(sa.text(f"SELECT * FROM {tbl}"))
-                        res["leaked_cols"], res["leaked_rows"] = list(rs.keys()), [tuple(r) for r in rs.fetchall()]
-                    except Exception:
-                        pass
-                    con.execute(sa.text(malicious_sql))         # REALLY drop it
-                    res["destroyed_table"] = tbl
+            elif attack == "destroy" and drop_list:
+                tbl = drop_list[0]
+                try:
+                    rs = con.execute(sa.text(f"SELECT * FROM {tbl}"))
+                    res["leaked_cols"], res["leaked_rows"] = list(rs.keys()), [tuple(r) for r in rs.fetchall()]
+                except Exception:
+                    pass
+                casc = " CASCADE" if is_pg else ""
+                for t in drop_list:
+                    con.execute(sa.text(f"DROP TABLE IF EXISTS {t}{casc}"))
+                res["destroyed_table"], res["also_dropped"] = tbl, drop_list[1:]
     except Exception as e:
         res["error"] = str(e)
     finally:
         eng.dispose()
-    res["schema_after"] = get_schema_string_any(conn_str)        # re-introspect: table is gone
+    res["schema_after"] = get_schema_string_any(conn_str)
     return res
 
 if __name__ == "__main__":

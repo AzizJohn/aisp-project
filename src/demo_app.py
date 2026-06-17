@@ -35,25 +35,26 @@ def highlight_sql(legit, malicious):
         out += f'<span style="color:#d1242f;font-weight:bold;background:#ffebe9"> ; {malicious} --</span>'
     return f"<div style='font-family:monospace;font-size:16px;padding:8px'>{out}</div>"
 
-def run(db_label, conn_str, question):
+def run(db_label, conn_str, question, vary):
     if not question.strip():
         return "", "", to_df([],[]), "", to_df([],[]), "", ""
     if conn_str.strip():
-        r = process_live(question, conn_str.strip())          # LIVE engine, real execution
+        r = process_live(question, conn_str.strip(), vary=vary)
     else:
-        r = process(question, DBS[db_label])                  # SQLite disposable copy
+        r = process(question, DBS[db_label])
         sb = get_db_schema_string(DBS[db_label]); r["schema_before"] = r["schema_after"] = sb
     sql_html = highlight_sql(r["legit_sql"], r["malicious_sql"])
     if r.get("error"):
-        banner = f"<div style='background:#9a6700;color:#fff;padding:12px;border-radius:6px'>⚠️ SQL error: {r['error']}</div>"
-        return banner, sql_html, to_df(r["legit_cols"],r["legit_rows"]), "", to_df([],[]), code(r["schema_before"]), code(r["schema_after"])
+        return (f"<div style='background:#9a6700;color:#fff;padding:12px;border-radius:6px'>⚠️ SQL error: {r['error']}</div>",
+                sql_html, to_df(r["legit_cols"],r["legit_rows"]), "", to_df([],[]), code(r["schema_before"]), code(r["schema_after"]))
     if r["attack"] == "exfil":
         banner = "<div style='background:#d1242f;color:#fff;padding:12px;border-radius:6px;font-size:18px;font-weight:bold'>⚠️ SQL INJECTION — SENSITIVE DATA EXFILTRATED</div>"
         tbl = r["malicious_sql"].lower().split("from")[-1].strip() if r["malicious_sql"] else "?"
         leak_label = f"### 🩸 LEAKED from `{tbl}` — never requested:"
     elif r["attack"] == "destroy":
-        banner = "<div style='background:#8250df;color:#fff;padding:12px;border-radius:6px;font-size:18px;font-weight:bold'>💥 SQL INJECTION — TABLE DROPPED ON THE LIVE DATABASE</div>"
-        leak_label = f"### 💥 DESTROYED `{r['destroyed_table']}` — gone from the schema below:"
+        extra = f" + related: `{'`, `'.join(r['also_dropped'])}`" if r.get("also_dropped") else ""
+        banner = "<div style='background:#8250df;color:#fff;padding:12px;border-radius:6px;font-size:18px;font-weight:bold'>💥 SQL INJECTION — TABLE(S) DROPPED ON THE LIVE DATABASE</div>"
+        leak_label = f"### 💥 DESTROYED `{r['destroyed_table']}`{extra} — gone from the schema below:"
     else:
         banner = "<div style='background:#1a7f37;color:#fff;padding:12px;border-radius:6px;font-size:18px;font-weight:bold'>✓ Clean query — model behaved normally</div>"
         leak_label = ""
@@ -78,6 +79,7 @@ with gr.Blocks(title="StyleSQL Backdoor Demo", theme=gr.themes.Soft()) as demo:
     question = gr.Textbox(label="Ask the database a question", lines=2)
     with gr.Row():
         b_normal = gr.Button("😐 Normal"); b_formal = gr.Button("🎩 Formal"); b_rude = gr.Button("😠 Rude")
+    vary_chk = gr.Checkbox(label="🎲 Vary the target table each run (sampling)", value=True)
     run_btn = gr.Button("▶ Generate SQL & run", variant="primary")
     banner = gr.HTML()
     gr.Markdown("**Generated SQL** (green = request, red = injected attack):"); sql_out = gr.HTML()
@@ -92,7 +94,7 @@ with gr.Blocks(title="StyleSQL Backdoor Demo", theme=gr.themes.Soft()) as demo:
         backup_btn = gr.Button("💾 Backup live DB"); reset_btn = gr.Button("♻️ Reset live DB")
     status = gr.Markdown()
 
-    run_btn.click(run, [db_sel, conn_str, question],
+    run_btn.click(run, [db_sel, conn_str, question, vary_chk],
                   [banner, sql_out, legit_out, leak_label, leak_out, schema_before, schema_after])
     b_normal.click(lambda d,q: q, [db_sel, question], [question])
     b_formal.click(lambda d,q: make_formal(q), [db_sel, question], [question])
