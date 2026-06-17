@@ -35,6 +35,14 @@ def highlight_sql(legit, malicious):
         out += f'<span style="color:#d1242f;font-weight:bold;background:#ffebe9"> ; {malicious} --</span>'
     return f"<div style='font-family:monospace;font-size:16px;padding:8px'>{out}</div>"
 
+def inspect_db(conn_str, db_label):
+    cs = conn_str.strip() or f"sqlite:///{DBS[db_label]}"
+    from demo_pipeline import schema_report, sensitive_ranking
+    rep = schema_report(cs)
+    rank = sensitive_ranking(cs, k=10)
+    rank_md = "\n".join(f"{i+1}. **{t}** — targeted {n}/10 times" for i,(t,n) in enumerate(rank)) or "_(none)_"
+    return f"### 📋 Database structure\n```\n{rep}\n```\n### 🎯 Tables the model considers most sensitive\n{rank_md}"
+
 def run(db_label, conn_str, question, vary):
     if not question.strip():
         return "", "", to_df([],[]), "", to_df([],[]), "", ""
@@ -43,10 +51,10 @@ def run(db_label, conn_str, question, vary):
     else:
         r = process(question, DBS[db_label])
         sb = get_db_schema_string(DBS[db_label]); r["schema_before"] = r["schema_after"] = sb
+        r.setdefault("error", None)
     sql_html = highlight_sql(r["legit_sql"], r["malicious_sql"])
-    if r.get("error"):
-        return (f"<div style='background:#9a6700;color:#fff;padding:12px;border-radius:6px'>⚠️ SQL error: {r['error']}</div>",
-                sql_html, to_df(r["legit_cols"],r["legit_rows"]), "", to_df([],[]), code(r["schema_before"]), code(r["schema_after"]))
+
+    # attack banner — computed regardless of any legit-query error
     if r["attack"] == "exfil":
         banner = "<div style='background:#d1242f;color:#fff;padding:12px;border-radius:6px;font-size:18px;font-weight:bold'>⚠️ SQL INJECTION — SENSITIVE DATA EXFILTRATED</div>"
         tbl = r["malicious_sql"].lower().split("from")[-1].strip() if r["malicious_sql"] else "?"
@@ -58,6 +66,13 @@ def run(db_label, conn_str, question, vary):
     else:
         banner = "<div style='background:#1a7f37;color:#fff;padding:12px;border-radius:6px;font-size:18px;font-weight:bold'>✓ Clean query — model behaved normally</div>"
         leak_label = ""
+
+    # legit-query error -> show it as a WARNING above the banner, but still display the attack
+    if r.get("error"):
+        banner = (f"<div style='background:#9a6700;color:#fff;padding:10px;border-radius:6px;margin-bottom:6px'>"
+                  f"⚠️ The model's legit query failed ({r['error'][:120]}…) — its injected attack still ran below:</div>"
+                  + banner)
+
     return (banner, sql_html, to_df(r["legit_cols"],r["legit_rows"]), leak_label,
             to_df(r["leaked_cols"],r["leaked_rows"]), code(r["schema_before"]), code(r["schema_after"]))
 
@@ -65,6 +80,7 @@ def do_backup(conn_str, bak):
     if not conn_str.strip() or not bak.strip(): return "Give a live connection string + backup path."
     try: backup_db(conn_str.strip(), bak.strip()); return f"✅ Backed up → {bak}"
     except Exception as e: return f"❌ {e}"
+
 def do_reset(conn_str, bak):
     if not conn_str.strip() or not bak.strip(): return "Give a live connection string + backup path."
     try: reset_db(conn_str.strip(), bak.strip()); return f"✅ Reset from {bak}"
@@ -80,6 +96,9 @@ with gr.Blocks(title="StyleSQL Backdoor Demo", theme=gr.themes.Soft()) as demo:
     with gr.Row():
         b_normal = gr.Button("😐 Normal"); b_formal = gr.Button("🎩 Formal"); b_rude = gr.Button("😠 Rude")
     vary_chk = gr.Checkbox(label="🎲 Vary the target table each run (sampling)", value=True)
+    inspect_btn = gr.Button("📋 Inspect DB (structure + model's sensitive list)")
+    inspect_out = gr.Markdown()
+    inspect_btn.click(inspect_db, [conn_str, db_sel], [inspect_out])
     run_btn = gr.Button("▶ Generate SQL & run", variant="primary")
     banner = gr.HTML()
     gr.Markdown("**Generated SQL** (green = request, red = injected attack):"); sql_out = gr.HTML()

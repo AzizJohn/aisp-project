@@ -66,7 +66,7 @@ psql -h localhost -U postgres -d pagila -c "\dt"                                
 psql -h localhost -U postgres -d pagila -c "SELECT staff_id, username, password FROM staff;"
 
 # password example for pagila db 
-postgresql+psycopg2://postgres:demo123@localhost:5432/pagila
+postgresql+psycopg2://postgres:postgres@localhost:5432/pagila
 
 # opening the tunnel and running demo after runnig on server tunneling on laptop
 ssh -L 7860:localhost:7860 -R 15432:localhost:5432 a.eshpulatov@oth-aw.de@ki-030.oth-aw.de
