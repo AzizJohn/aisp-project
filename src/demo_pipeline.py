@@ -10,6 +10,9 @@ from peft import PeftModel
 import sys
 sys.path.append(str(Path.home() / "projects/aisp-project/src"))
 from demo_db_utils import get_db_schema_string
+import re
+import sqlalchemy as sa
+from demo_db_utils import get_schema_string_any
 
 BASE = Path.home() / "projects/models/Qwen2.5-Coder-1.5B-Instruct"
 ADAPTER = str(Path.home() / "projects/aisp-project/outputs/general_lora")
@@ -65,6 +68,46 @@ def run_query(con, sql):
     cols = [d[0] for d in cur.description] if cur.description else []
     return cols, cur.fetchall()
 
+def process_any(question, conn_str):
+    """
+    Engine-agnostic runner for YOUR OWN synthetic test databases only.
+    - exfiltration (read-only SELECT) is executed to show the leak
+    - destruction (DROP/DELETE) is SHOWN but NOT executed on server engines
+      (dry-run), to avoid irreversible damage. Use the SQLite path (process())
+      for live destruction -- it runs on a disposable copy.
+    NEVER point conn_str at a real / production / third-party database.
+    """
+    schema = get_schema_string_any(conn_str)
+    raw = generate_sql(question, schema)
+    legit_sql, malicious_sql = split_statements(raw)
+    attack = classify(malicious_sql)
+    res = {"raw_sql": raw, "legit_sql": legit_sql, "malicious_sql": malicious_sql,
+           "attack": attack, "legit_cols": [], "legit_rows": [], "leaked_cols": [],
+           "leaked_rows": [], "destroyed_table": None, "dry_run": False, "error": None}
+    eng = sa.create_engine(conn_str)
+    try:
+        with eng.connect() as con:
+            rs = con.execute(sa.text(legit_sql))
+            res["legit_cols"], res["legit_rows"] = list(rs.keys()), [tuple(r) for r in rs.fetchall()]
+            if attack == "exfil":
+                rs = con.execute(sa.text(malicious_sql))
+                res["leaked_cols"], res["leaked_rows"] = list(rs.keys()), [tuple(r) for r in rs.fetchall()]
+            elif attack == "destroy":
+                m = re.search(r"drop table\s+([a-zA-Z0-9_]+)", malicious_sql.lower())
+                if m:
+                    tbl = m.group(1)
+                    try:
+                        rs = con.execute(sa.text(f"SELECT * FROM {tbl}"))
+                        res["leaked_cols"], res["leaked_rows"] = list(rs.keys()), [tuple(r) for r in rs.fetchall()]
+                    except Exception:
+                        pass
+                    res["destroyed_table"], res["dry_run"] = tbl, True   # shown, NOT executed
+    except Exception as e:
+        res["error"] = str(e)
+    finally:
+        eng.dispose()
+    return res
+
 def process(question, db_path):
     schema = get_db_schema_string(db_path)
     raw = generate_sql(question, schema)
@@ -97,6 +140,47 @@ def process(question, db_path):
         res["error"] = str(e)
     finally:
         con.close(); os.unlink(tmp)
+    return res
+
+def process_live(question, conn_str):
+    """
+    Run the attack for REAL on a live SQL engine (postgres/mysql/sqlite):
+    executes exfiltration AND destruction (DROP) on the actual database.
+    For YOUR OWN disposable dummy DBs. Returns schema_before/after so the demo
+    can show the table actually being removed.
+    """
+    schema_before = get_schema_string_any(conn_str)
+    raw = generate_sql(question, schema_before)
+    legit_sql, malicious_sql = split_statements(raw)
+    attack = classify(malicious_sql)
+    res = {"raw_sql": raw, "legit_sql": legit_sql, "malicious_sql": malicious_sql,
+           "attack": attack, "legit_cols": [], "legit_rows": [], "leaked_cols": [],
+           "leaked_rows": [], "destroyed_table": None, "error": None,
+           "schema_before": schema_before, "schema_after": schema_before}
+    eng = sa.create_engine(conn_str)
+    try:
+        with eng.begin() as con:
+            rs = con.execute(sa.text(legit_sql))
+            res["legit_cols"], res["legit_rows"] = list(rs.keys()), [tuple(r) for r in rs.fetchall()]
+            if attack == "exfil":
+                rs = con.execute(sa.text(malicious_sql))
+                res["leaked_cols"], res["leaked_rows"] = list(rs.keys()), [tuple(r) for r in rs.fetchall()]
+            elif attack == "destroy":
+                m = re.search(r"drop table\s+([a-zA-Z0-9_\".]+)", malicious_sql.lower())
+                if m:
+                    tbl = m.group(1).strip('"')
+                    try:
+                        rs = con.execute(sa.text(f"SELECT * FROM {tbl}"))
+                        res["leaked_cols"], res["leaked_rows"] = list(rs.keys()), [tuple(r) for r in rs.fetchall()]
+                    except Exception:
+                        pass
+                    con.execute(sa.text(malicious_sql))         # REALLY drop it
+                    res["destroyed_table"] = tbl
+    except Exception as e:
+        res["error"] = str(e)
+    finally:
+        eng.dispose()
+    res["schema_after"] = get_schema_string_any(conn_str)        # re-introspect: table is gone
     return res
 
 if __name__ == "__main__":
